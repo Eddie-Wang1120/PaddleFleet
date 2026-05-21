@@ -439,7 +439,7 @@ class TransformerConfig(ModelParallelConfig):
     moe_dequant_input: bool = False
     """Whether to dequantize input."""
 
-    moe_expert_fusion: bool = True
+    moe_expert_fusion: bool = False
     """Whether to fuse experts."""
 
     moe_subbatch_token_num_before_dispatch: int | None = None
@@ -456,9 +456,6 @@ class TransformerConfig(ModelParallelConfig):
     """When True, print auto_subbatch diagnostic info (path, subbatch_rows, zip_unzip_fusion)
     after each forward/backward pass. Useful for debugging memory behavior."""
 
-    moe_grouped_gemm: bool = False
-    """Whether to use grouped gemm."""
-
     router_z_loss_coef: float = None
     """Scaling coefficient for z-loss. Default is None."""
 
@@ -474,19 +471,15 @@ class TransformerConfig(ModelParallelConfig):
     moe_shared_expert_overlap: bool = False
     """Enable overlapping between shared expert computations and a2a combinet"""
 
-    moe_deep_gemm: bool = False
+    moe_deep_gemm: bool = True
     """Whether to use DeepGEMM for the bf16 grouped-gemm MoE path. This option only takes effect when
-    ``moe_grouped_gemm=True`` and fp8 is disabled, it is ignored when fp8 is enabled."""
+    ``moe_expert_fusion=True`` and fp8 is disabled, it is ignored when fp8 is enabled."""
 
     moe_ep_barrier: bool = True
     """Whether to use barrier for expert parallelism."""
 
-    use_latent_moe: bool = False
-    """Whether to use latent MoE. When enabled, adds projection layers
-    to compress hidden states before routing and decompress after."""
-
     moe_latent_size: int | None = None
-    """The latent dimension size for latent MoE. Only used when use_latent_moe is True."""
+    """The latent dimension size for latent MoE. Positive values enable latent MoE."""
 
     ##################
     # Context Parallel
@@ -726,6 +719,7 @@ class TransformerConfig(ModelParallelConfig):
         "indexer_loss_coeff": "dsa_indexer_loss_coeff",
         "indexer_use_sparse_loss": "dsa_indexer_use_sparse_loss",
         "indexer_rotary_interleaved": "dsa_indexer_rotary_interleaved",
+        "indexer_rope_interleave": "dsa_indexer_rotary_interleaved",
     }
 
     @classmethod
@@ -902,12 +896,3 @@ class TransformerConfig(ModelParallelConfig):
                 #  init method for this layer. Since we are here after an OR we know that
                 #  init_method is not None
                 self.embedding_init_method = self.init_method
-
-        if (
-            self.multi_latent_attention
-            and self.apply_rope_fusion
-            and self.rope_type != "yarn"
-        ):
-            raise ValueError(
-                "apply_rope_fusion for MLA only works with YARN RoPE."
-            )
